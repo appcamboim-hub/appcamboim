@@ -1,0 +1,185 @@
+"use client";
+
+import { useState } from "react";
+import { useDespesas } from "@/lib/supabase/hooks";
+import type { Despesa } from "@/lib/supabase/hooks";
+import { useLoadSupabaseData } from "@/hooks/useLoadSupabaseData";
+import Sidebar from "./Sidebar";
+import BottomNav from "./BottomNav";
+import HeaderSupabase from "./HeaderSupabase";
+import DashboardSupabase from "@/components/dashboard/DashboardSupabase";
+import NovaDespesaPageSupabase from "@/components/despesas/NovaDespesaPageSupabase";
+import MinhasDespesasPageSupabase from "@/components/despesas/MinhasDespesasPageSupabase";
+import TodasDespesasPage from "@/components/despesas/TodasDespesasPage";
+import AprovacaoPageSupabase from "@/components/aprovacao/AprovacaoPageSupabase";
+import FinanceiroPageSupabase from "@/components/financeiro/FinanceiroPageSupabase";
+import RelatoriosPageSupabase from "@/components/relatorios/RelatoriosPageSupabase";
+import IntegracoesERPPageSupabase from "@/components/integracoes/IntegracoesERPPageSupabase";
+import UsuariosPageSupabase from "@/components/admin/UsuariosPageSupabase";
+import TiposDespesaPageSupabase from "@/components/admin/TiposDespesaPageSupabase";
+import FrotasPageSupabase from "@/components/admin/FrotasPageSupabase";
+import AlterarSenhaModalSupabase from "@/components/auth/AlterarSenhaModalSupabase";
+import AuditoriaPageSupabase from "@/components/admin/AuditoriaPageSupabase";
+import BackupComprovantesPageSupabase from "@/components/admin/BackupComprovantesPageSupabase";
+import ReembolsoPage from "@/components/reembolso/ReembolsoPage";
+import ControleKmPage from "@/components/km/ControleKmPage";
+import { useAppStore } from "@/lib/store";
+import { usePendenciasCount } from "@/hooks/usePendenciasCount";
+
+export type PageKey =
+  | "dashboard"
+  | "nova-despesa"
+  | "minhas-despesas"
+  | "aprovacao"
+  | "financeiro"
+  | "reembolso"
+  | "integracoes-erp"
+  | "relatorios"
+  | "usuarios"
+  | "tipos-despesa"
+  | "frotas"
+  | "controle-km"
+  | "auditoria"
+  | "backup-comprovantes"
+  | "alterar-senha";
+
+export type NavigateFn = (page: PageKey, statusFilter?: string) => void;
+
+export default function AppShellSupabase() {
+  const { currentUser } = useAppStore();
+  useLoadSupabaseData();
+  const pendencias = usePendenciasCount();
+  
+  const [page, setPage] = useState<PageKey>("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showAlterarSenha, setShowAlterarSenha] = useState(false);
+  const [editingDespesa, setEditingDespesa] = useState<Despesa | null>(null);
+  const [initialStatusFilter, setInitialStatusFilter] = useState<string | undefined>(undefined);
+
+  const navigate = (p: PageKey, statusFilter?: string) => {
+    if (p === "alterar-senha") {
+      setShowAlterarSenha(true);
+      return;
+    }
+    setInitialStatusFilter(statusFilter);
+    setPage(p);
+    setSidebarOpen(false);
+    setEditingDespesa(null);
+  };
+
+  const handleEditDespesa = (despesa: Despesa) => {
+    setEditingDespesa(despesa);
+    setPage("nova-despesa");
+  };
+
+  const renderPage = () => {
+    switch (page) {
+      case "dashboard": return <DashboardSupabase onNavigate={navigate} />;
+      case "nova-despesa": return (
+        <NovaDespesaPageSupabase 
+          onBack={() => { setEditingDespesa(null); setPage("minhas-despesas"); }} 
+          editDespesa={editingDespesa}
+        />
+      );
+      case "minhas-despesas": return (
+        <MinhasDespesasPageSupabase 
+          onNova={() => { setEditingDespesa(null); setPage("nova-despesa"); }}
+          onEditar={handleEditDespesa}
+          initialStatus={initialStatusFilter}
+        />
+      );
+      case "aprovacao": return <AprovacaoPageSupabase />;
+      case "financeiro": return <FinanceiroPageSupabase />;
+      case "reembolso": return <ReembolsoPage />;
+      case "integracoes-erp": return <IntegracoesERPPageSupabase />;
+      case "relatorios": return <RelatoriosPageSupabase />;
+      case "usuarios": return <UsuariosPageSupabase />;
+      case "tipos-despesa": return <TiposDespesaPageSupabase />;
+      case "frotas": return <FrotasPageSupabase />;
+      case "controle-km": return <ControleKmPage />;
+      case "todas-despesas": return <TodasDespesasPage initialStatus={initialStatusFilter} />;
+      case "auditoria": return <AuditoriaPageSupabase />;
+      case "backup-comprovantes": return <BackupComprovantesPageSupabase />;
+      default: return <DashboardSupabase onNavigate={navigate} />;
+    }
+  };
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-background">
+      {/* Sidebar desktop */}
+      <div className="hidden lg:flex">
+        <Sidebar
+          currentPage={page}
+          onNavigate={navigate}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+          pendencias={pendencias}
+        />
+      </div>
+
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 lg:hidden transition-transform duration-300 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <Sidebar
+            currentPage={page}
+            onNavigate={navigate}
+            collapsed={false}
+            onToggleCollapse={() => {}}
+            mobile
+            onClose={() => setSidebarOpen(false)}
+            pendencias={pendencias}
+          />
+      </div>
+
+      {/* Main content */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        <HeaderSupabase
+          onMenuClick={() => setSidebarOpen(true)}
+          onAlterarSenha={() => setShowAlterarSenha(true)}
+          totalPendencias={pendencias.total}
+          pendencias={pendencias}
+          onNavigate={navigate}
+        />
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 lg:pb-6">
+          {renderPage()}
+        </main>
+      </div>
+
+      {/* Bottom nav mobile */}
+      <BottomNav currentPage={page} onNavigate={navigate} pendencias={pendencias} />
+
+      {/* Floating Nova Despesa button mobile */}
+      {currentUser?.perfil === "funcionario" && page !== "nova-despesa" && (
+        <button
+          onClick={() => navigate("nova-despesa")}
+          className="fixed bottom-20 right-4 z-30 lg:hidden w-14 h-14 rounded-full bg-accent text-white shadow-lg flex items-center justify-center text-2xl font-bold hover:bg-accent/90 active:scale-95 transition-all"
+          aria-label="Nova Despesa"
+        >
+          +
+        </button>
+      )}
+
+      {/* Modal forçado no primeiro acesso — não pode ser fechado */}
+      {currentUser?.primeiro_acesso && (
+        <AlterarSenhaModalSupabase forced />
+      )}
+
+      {/* Modal voluntário de alteração de senha */}
+      {!currentUser?.primeiro_acesso && showAlterarSenha && (
+        <AlterarSenhaModalSupabase
+          onClose={() => setShowAlterarSenha(false)}
+        />
+      )}
+    </div>
+  );
+}
